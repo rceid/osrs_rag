@@ -21,12 +21,17 @@ def _sync_player(username: str):
     with st.spinner(f"Loading {username}..."):
         try:
             stats = fetch_stats(username)
-            quests = fetch_quests(username)
-            st.session_state.profile["username"] = username
-            profile_store.update_from_api(st.session_state.profile, stats, quests)
-            st.success(f"Loaded {username}: {len(stats)} skills, {len(quests)} quests")
         except Exception as e:
-            st.error(f"Could not load profile: {e}")
+            st.error(f"Could not load stats: {e}")
+            return
+        # Quest API (Runemetrics) is defunct for OSRS — soft-fail and keep stats
+        try:
+            quests = fetch_quests(username)
+        except Exception:
+            quests = st.session_state.profile.get("quests", {})
+        st.session_state.profile["username"] = username
+        profile_store.update_from_api(st.session_state.profile, stats, quests)
+        st.success(f"Loaded {username}: {len(stats)} skills")
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -126,7 +131,9 @@ if user_input:
                         {"role": m["role"], "content": m["content"]}
                         for m in st.session_state.history
                     ],
-                    st.session_state.profile if st.session_state.profile.get("username") else None,
+                    st.session_state.profile if any(
+                        st.session_state.profile.get(k) for k in ("username", "stats", "teleports")
+                    ) else None,
                 )
                 st.markdown(answer)
                 if sources:

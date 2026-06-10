@@ -1,8 +1,11 @@
 """Builds prompts, manages chat history, and calls the configured LLM."""
 from __future__ import annotations
 
+from config import TELEPORT_ITEMS
 from llm import chat_completion
 from retrieval.search import search
+
+_TELEPORT_LABELS = dict(TELEPORT_ITEMS)
 
 
 SYSTEM_PROMPT = """You are a knowledgeable OSRS (Old School RuneScape) assistant.
@@ -10,8 +13,8 @@ SYSTEM_PROMPT = """You are a knowledgeable OSRS (Old School RuneScape) assistant
 CRITICAL RULES — these prevent giving wrong information:
 1. ONLY use facts that appear in the "Relevant wiki information" below. If a fact is not in the context, you do NOT know it.
 2. If the user asks for specific details (quest requirements, item stats, levels, exact codes, prices) and those details are NOT in the context, say so explicitly: "I don't see the specific requirements in the wiki excerpts I have — check the wiki page directly." DO NOT GUESS, ESTIMATE, OR MAKE UP NUMBERS OR REQUIREMENTS.
-3. When asked about travel/transport to a location, consider ALL methods in the context — including teleport spells, jewellery teleports, fairy ring codes (e.g. "DHY"), spirit trees, and amulets — and list them comparatively (fastest first). Don't fixate on the first method you see.
-4. When recommending routes, only suggest options the player has available based on their stats and teleport items in the player profile.
+3. When asked about travel/transport to a location, consider ALL methods in the context — including teleport spells, jewellery teleports, fairy ring codes (e.g. "DHY"), spirit trees, and amulets. Don't fixate on the first method you see.
+4. If the player profile lists teleport methods they OWN, put routes using those methods FIRST (fastest owned method at the top), then list remaining methods under a separate "Other options" section. If no profile is provided, just order fastest first.
 5. Always cite sources by referencing wiki page titles in brackets, e.g. [Fairy rings].
 
 Be specific and helpful, but honesty about gaps beats confident guessing."""
@@ -52,7 +55,14 @@ def _build_player_context(profile: dict | None) -> str:
                 lines.append(f"  (and {len(completed) - 20} more)")
 
     if profile.get("teleports"):
-        lines.append(f"- Available teleports: {', '.join(profile['teleports'])}")
+        labels = [_TELEPORT_LABELS.get(k, k) for k in profile["teleports"]]
+        lines.append(f"- Teleport methods the player OWNS: {', '.join(labels)}")
+        lines.append(
+            "- For any travel/route question, ORDER your suggestions as follows: "
+            "FIRST list every viable route using teleport methods the player OWNS (from the list above), "
+            "THEN list other methods from the wiki context under a separate heading like 'Other options (not in your list)'. "
+            "Never lead with a method the player doesn't own."
+        )
 
     return "\n".join(lines)
 

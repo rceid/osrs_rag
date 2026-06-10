@@ -144,5 +144,7 @@ if user_input:
                 ]
             except Exception as e:
                 st.error(f"Error: {e}")
-                if "Connection refused" in str(e) or "11434" in str(e):
+                if "MISTRAL_API_KEY" in str(e):
+                    st.info("Set your Mistral API key: `export MISTRAL_API_KEY=...` then restart streamlit. Free keys at console.mistral.ai")
+                elif "Connection refused" in str(e) or "11434" in str(e):
                     st.info("Make sure Ollama is running: `ollama serve` in a terminal")

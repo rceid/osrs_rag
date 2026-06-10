@@ -1,15 +1,20 @@
-"""Builds prompts, manages chat history, and calls Ollama."""
-import requests
-import json
+"""Builds prompts, manages chat history, and calls the configured LLM."""
+from __future__ import annotations
 
-from config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from llm import chat_completion
 from retrieval.search import search
 
 
 SYSTEM_PROMPT = """You are a knowledgeable OSRS (Old School RuneScape) assistant.
-Answer questions using the wiki context provided. Be specific and helpful.
-When recommending routes or methods, only suggest options the player has available based on their stats and teleport items.
-Always cite your sources by referencing the wiki page titles."""
+
+CRITICAL RULES — these prevent giving wrong information:
+1. ONLY use facts that appear in the "Relevant wiki information" below. If a fact is not in the context, you do NOT know it.
+2. If the user asks for specific details (quest requirements, item stats, levels, exact codes, prices) and those details are NOT in the context, say so explicitly: "I don't see the specific requirements in the wiki excerpts I have — check the wiki page directly." DO NOT GUESS, ESTIMATE, OR MAKE UP NUMBERS OR REQUIREMENTS.
+3. When asked about travel/transport to a location, consider ALL methods in the context — including teleport spells, jewellery teleports, fairy ring codes (e.g. "DHY"), spirit trees, and amulets — and list them comparatively (fastest first). Don't fixate on the first method you see.
+4. When recommending routes, only suggest options the player has available based on their stats and teleport items in the player profile.
+5. Always cite sources by referencing wiki page titles in brackets, e.g. [Fairy rings].
+
+Be specific and helpful, but honesty about gaps beats confident guessing."""
 
 MAX_HISTORY = 10
 
@@ -76,13 +81,7 @@ def chat(
     messages.extend(history[-MAX_HISTORY:])
     messages.append({"role": "user", "content": user_message})
 
-    resp = requests.post(
-        f"{OLLAMA_BASE_URL}/api/chat",
-        json={"model": OLLAMA_MODEL, "messages": messages, "stream": False},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    answer = resp.json()["message"]["content"]
+    answer = chat_completion(messages)
 
     updated_history = history + [
         {"role": "user", "content": user_message},
